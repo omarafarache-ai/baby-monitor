@@ -13,7 +13,7 @@
 :root{--bg:#0e0f1f;--card:#1a1c33;--card2:#24274a;--text:#eef0ff;--muted:#9aa0c7;--accent:#8b7cff;--teal:#2ec4b6;--warn:#ffb020;--bad:#ff5a6a;--ok:#3ddc84}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
-button{font:inherit;color:inherit;border:0;border-radius:14px;padding:12px 16px;background:var(--card2);cursor:pointer}
+button{touch-action:manipulation;font:inherit;color:inherit;border:0;border-radius:14px;padding:12px 16px;background:var(--card2);cursor:pointer}
 button.primary{background:var(--accent);color:#fff;font-weight:600}
 button.small{padding:6px 12px;font-size:14px}
 textarea{width:100%;min-height:70px;border-radius:12px;border:1px solid #3a3e6b;background:#11132a;color:var(--text);padding:10px;font:13px ui-monospace,Menlo,monospace}
@@ -98,7 +98,7 @@ details > *{margin-top:8px}
   <div id="envWarn" class="warnbox hidden"></div>
   <button class="role" id="pickCamera"><span class="ic" style="background:#2b2660">📹</span><span><b>Camera</b><small>Put this phone in the baby's room</small></span></button>
   <button class="role" id="pickParent"><span class="ic" style="background:#163f3c">📱</span><span><b>Parent</b><small>Watch, listen and get alerts</small></span></button>
-  <p class="fine" style="text-align:center">Open this same page on both phones.</p>
+  <p class="fine" style="text-align:center">Open this same page on both phones. · v3</p>
 </section>
 
 <!-- ============ CAMERA ============ -->
@@ -125,7 +125,7 @@ details > *{margin-top:8px}
     <details><summary>No camera? Pair by copy &amp; paste</summary>
       <button class="small" id="copyOffer">Copy pairing code</button>
       <textarea id="answerPaste" placeholder="Paste the reply code from the parent phone (starts with BMA1:)"></textarea>
-      <button class="small" id="useAnswer">Connect</button>
+      <button class="primary" id="useAnswer" style="width:100%">Connect</button>
     </details>
     <button id="closePair" style="width:100%">Close</button>
   </div></div>
@@ -146,7 +146,7 @@ details > *{margin-top:8px}
     <p id="p1msg" class="fine"></p>
     <details><summary>Pair by copy &amp; paste instead</summary>
       <textarea id="offerPaste" placeholder="Paste the camera's pairing code (starts with BMO1:)"></textarea>
-      <button class="small" id="useOffer">Continue</button>
+      <button class="primary" id="useOffer" style="width:100%">Continue</button>
     </details>
   </div>
 
@@ -334,6 +334,10 @@ async function unpackSDP(prefix, str) {
   const o = JSON.parse(new TextDecoder().decode(bytes));
   if (!o || typeof o.s !== 'string' || (o.t !== 'offer' && o.t !== 'answer')) throw new Error('damaged code');
   return { type: o.t, sdp: o.s };
+}
+function extractCode(prefix, str) {
+  const m = String(str || '').match(new RegExp(prefix.replace(':', '\\:') + '[A-Za-z0-9_-]+'));
+  return m ? m[0] : '';
 }
 function waitIce(pc, ms) {
   return new Promise((resolve) => {
@@ -540,7 +544,8 @@ function closePairing() {
 }
 let answerBusy = false;
 async function onAnswerScanned(str) {
-  if (answerBusy || !cam.pending || !str.startsWith(ANSWER)) return;
+  str = extractCode(ANSWER, str);
+  if (answerBusy || !cam.pending || !str) return;
   answerBusy = true;
   try {
     if (await cam.pending.acceptAnswer(str)) {
@@ -570,7 +575,22 @@ $('#closePair').onclick = () => closePairing();
 $('#btnDim').onclick = () => dim(true);
 $('#btnCamExit').onclick = () => location.reload();
 $('#copyOffer').onclick = (e) => { if (cam.pending && cam.pending.offerText) copyText(cam.pending.offerText, e.target); };
-$('#useAnswer').onclick = () => onAnswerScanned($('#answerPaste').value.trim());
+$('#useAnswer').onclick = async () => {
+  const raw = $('#answerPaste').value;
+  const code = extractCode(ANSWER, raw);
+  if (!raw.trim()) { text('#pairMsg', '⚠️ The box is empty — paste the reply code from the parent phone first.'); return; }
+  if (!code) {
+    text('#pairMsg', extractCode(OFFER, raw)
+      ? '⚠️ That is this camera\u2019s own code (BMO1…). Paste the REPLY code from the parent phone (it starts with BMA1:).'
+      : '⚠️ That doesn\u2019t look like a reply code. On the parent phone tap “Copy & paste instead → Copy reply code”, then paste here.');
+    return;
+  }
+  if (!cam.pending) { text('#pairMsg', '⚠️ Tap “➕ Pair” first, then paste again.'); return; }
+  text('#pairMsg', 'Checking code…');
+  await onAnswerScanned(code);
+  if ($('#pairMsg').textContent === 'Checking code…')
+    text('#pairMsg', '⚠️ This reply belongs to an older pairing code. On the parent phone tap “Start over” and scan this phone\u2019s current QR code again.');
+};
 
 // =====================================================================
 //  PARENT PHONE
@@ -792,7 +812,19 @@ $('#btnDimP').onclick = () => dim(true);
 $('#clearEvents').onclick = () => { $('#events').innerHTML = ''; $('#noEvents').classList.remove('hidden'); };
 $('#btnRepair').onclick = () => beginParentPairing();
 $('#restartPair').onclick = () => beginParentPairing();
-$('#useOffer').onclick = () => useOffer($('#offerPaste').value.trim());
+$('#useOffer').onclick = () => {
+  const raw = $('#offerPaste').value;
+  const code = extractCode(OFFER, raw);
+  if (!raw.trim()) { text('#p1msg', '⚠️ The box is empty — paste the camera\u2019s pairing code first.'); return; }
+  if (!code) {
+    text('#p1msg', extractCode(ANSWER, raw)
+      ? '⚠️ That is a parent reply code. Paste the code from the CAMERA phone (it starts with BMO1:).'
+      : '⚠️ That doesn\u2019t look like a pairing code. On the camera phone tap “Copy pairing code”, then paste here.');
+    return;
+  }
+  text('#p1msg', 'Checking code…');
+  useOffer(code);
+};
 $('#copyAnswer').onclick = (e) => { if (par.answerText) copyText(par.answerText, e.target); };
 $('#btnParentExit').onclick = () => location.reload();
 
