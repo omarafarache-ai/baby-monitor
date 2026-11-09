@@ -52,6 +52,9 @@ h2{font-size:20px;margin:0 0 10px}
 .sheet .inner{max-width:520px;margin:0 auto}
 .qr{background:#fff;border-radius:16px;padding:10px;margin:12px auto;max-width:340px;aspect-ratio:1;display:grid;place-items:center;color:#333}
 .qr svg{width:100%;height:100%;display:block}
+#answerQR{max-width:min(92vw,460px)}
+.hint{background:#2a2244;border-radius:12px;padding:12px;font-size:14px;text-align:left;color:var(--text)}
+.hint li{margin:4px 0}
 .steps{padding-left:20px;margin:6px 0}
 .steps li{margin:6px 0}
 details{margin:12px 0}
@@ -152,6 +155,7 @@ details > *{margin-top:8px}
     <p class="fine">Turn the camera phone around and point its camera at this code. Keep both screens bright.</p>
     <div id="answerQR" class="qr"></div>
     <p id="p2msg" class="fine" style="text-align:center">Waiting for the camera phone…</p>
+    <div id="p2hint" class="hint hidden"></div>
     <details><summary>Copy &amp; paste instead</summary>
       <button class="small" id="copyAnswer">Copy reply code</button>
     </details>
@@ -305,8 +309,14 @@ async function through(bytes, stream) {
   return new Uint8Array(await new Response(out).arrayBuffer());
 }
 function slimSDP(sdp) {
-  // Drop TCP candidates: smaller QR codes, and UDP is all a home network needs.
-  return sdp.split('\r\n').filter((l) => !(l.startsWith('a=candidate') && / tcp /i.test(l))).join('\r\n');
+  // Keep only UDP IPv4 / .local candidates: much smaller QR codes, and that is all a home Wi-Fi needs.
+  return sdp.split('\r\n').filter((l) => {
+    if (!l.startsWith('a=candidate')) return true;
+    const f = l.split(' ');
+    if ((f[2] || '').toLowerCase() !== 'udp') return false;
+    if ((f[4] || '').includes(':')) return false;          // IPv6
+    return true;
+  }).join('\r\n');
 }
 async function packSDP(prefix, desc) {
   const raw = new TextEncoder().encode(JSON.stringify({ t: desc.type, s: slimSDP(desc.sdp) }));
@@ -348,16 +358,22 @@ class Scanner {
     this.canvas = document.createElement('canvas');
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
   }
-  start() { if (!this.timer) this.timer = setInterval(() => this.tick(), 220); }
+  start() { if (!this.timer) { this.flip = false; this.timer = setInterval(() => this.tick(), 250); } }
   stop() { clearInterval(this.timer); this.timer = null; }
   tick() {
     const v = this.video; if (v.readyState < 2 || !v.videoWidth) return;
-    const scale = Math.min(1, 900 / Math.max(v.videoWidth, v.videoHeight));
-    const w = Math.round(v.videoWidth * scale), h = Math.round(v.videoHeight * scale);
-    if (this.canvas.width !== w) { this.canvas.width = w; this.canvas.height = h; }
-    this.ctx.drawImage(v, 0, 0, w, h);
+    const vw = v.videoWidth, vh = v.videoHeight;
+    let sx = 0, sy = 0, sw = vw, sh = vh;
+    this.flip = !this.flip;
+    if (this.flip) {             // every other frame: zoom into the centre (helps when the phone is far away)
+      sw = Math.round(vw * 0.6); sh = Math.round(vh * 0.6); sx = (vw - sw) >> 1; sy = (vh - sh) >> 1;
+    }
+    const scale = Math.min(1600 / Math.max(sw, sh), this.flip ? 1.6 : 1);
+    const w = Math.round(sw * scale), h = Math.round(sh * scale);
+    if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
+    this.ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
     const img = this.ctx.getImageData(0, 0, w, h);
-    const code = jsQR(img.data, w, h, { inversionAttempts: 'dontInvert' });
+    const code = jsQR(img.data, w, h, { inversionAttempts: 'attemptBoth' });
     if (code && code.data) this.onText(code.data);
   }
 }
@@ -459,6 +475,7 @@ class CameraPeer {
   close() { this.closed = true; try { this.dc.close(); } catch (e) {} try { this.pc.close(); } catch (e) {} }
 }
 
+const NET_HINT = '<b>The phones found each other\u2019s code but can\u2019t connect.</b> Check: both on the <b>same Wi-Fi</b> (not one on mobile data or a guest network); <b>VPN off</b> on both; Settings › Wi-Fi › (i) › <b>Limit IP Address Tracking off</b>; if you have a mesh/extender, the router\u2019s \u201cAP/client isolation\u201d must be off.';
 const cam = { stream: null, peers: new Set(), pending: null, scanner: null, analyzer: null, battery: null };
 
 async function startCamera() {
@@ -526,7 +543,16 @@ async function onAnswerScanned(str) {
   if (answerBusy || !cam.pending || !str.startsWith(ANSWER)) return;
   answerBusy = true;
   try {
-    if (await cam.pending.acceptAnswer(str)) { cam.scanner.stop(); text('#pairMsg', 'Code received — connecting…'); beep(1, 990); }
+    if (await cam.pending.acceptAnswer(str)) {
+      cam.scanner.stop(); text('#pairMsg', 'Code received — connecting…'); beep(1, 990);
+      const peer = cam.pending;
+      setTimeout(() => {
+        if (cam.pending === peer && peer.pc.connectionState !== 'connected') {
+          beep(3, 440);
+          $('#pairMsg').innerHTML = NET_HINT + '<br>Then tap <b>➕ Pair</b> to try again.';
+        }
+      }, 20000);
+    }
   } catch (e) { text('#pairMsg', 'That code did not work: ' + e.message); }
   finally { answerBusy = false; }
 }
@@ -630,8 +656,18 @@ async function useOffer(str) {
     const peer = new ParentPeer(); par.peer = peer;
     par.answerText = await peer.acceptOffer(str);
     renderQR($('#answerQR'), par.answerText);
-    text('#p2msg', 'Waiting for the camera phone…');
+    text('#p2msg', 'Waiting for the camera phone to scan this…');
+    $('#p2hint').classList.add('hidden');
     parentStep(2);
+    clearTimeout(par.hintTimer);
+    par.hintTimer = setTimeout(() => {
+      if (par.peer === peer && !par.live) {
+        $('#p2hint').innerHTML = '<b>Still waiting?</b><ul style="margin:6px 0 0;padding-left:18px">' +
+          '<li><b>Did the camera phone beep once?</b> If not, it hasn\u2019t read this code: hold it 20–30 cm away, straight on, and turn this screen\u2019s brightness up. Or tap <i>Copy &amp; paste instead</i> and send the code to the camera phone (AirDrop/Notes), then paste it there.</li>' +
+          '<li><b>If it did beep</b>, the phones can\u2019t reach each other over Wi-Fi. ' + NET_HINT + '</li></ul>';
+        $('#p2hint').classList.remove('hidden');
+      }
+    }, 25000);
     beep(1, 990);
   } catch (e) {
     text('#p1msg', 'Could not use that code: ' + e.message);
