@@ -73,6 +73,7 @@ details > *{margin-top:8px}
 .hint{background:#2a2244;border-radius:12px;padding:12px;font-size:14px;text-align:left}
 .dim{position:fixed;inset:0;z-index:30;background:#000;color:rgba(255,255,255,.22);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:14px}
 .dim.night{background:radial-gradient(circle at 50% 45%,#ffb46a 0%,#c8682a 35%,#3a1806 75%,#120600 100%);color:rgba(60,20,0,.55)}
+.dim.red{background:radial-gradient(circle at 50% 45%,#ff2a00 0%,#e01600 55%,#9a0c00 100%);color:rgba(70,0,0,.55)}
 /* parent */
 #parent{max-width:640px;margin:0 auto}
 .topbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
@@ -81,7 +82,7 @@ details > *{margin-top:8px}
 .scanbox video{width:100%;height:100%;object-fit:cover}
 .scanbox .frame{position:absolute;inset:18%;border:3px solid rgba(255,255,255,.8);border-radius:18px}
 .stage{position:relative;border-radius:18px;overflow:hidden;background:#000;aspect-ratio:3/4;margin-bottom:10px}
-.stage video{width:100%;height:100%;object-fit:contain;transform-origin:50% 50%;transition:transform .25s}
+.stage video{width:100%;height:100%;object-fit:contain}
 .stage video.boost{filter:brightness(1.8) contrast(1.15)}
 .stage .tl{position:absolute;left:10px;top:10px;display:flex;gap:6px}
 .stage .tr{position:absolute;right:10px;top:10px;display:flex;gap:6px}
@@ -90,6 +91,17 @@ details > *{margin-top:8px}
 #stageMsg{position:absolute;left:12px;right:12px;bottom:12px;background:rgba(0,0,0,.7);border-radius:12px;padding:10px;text-align:center;font-size:14px}
 #stageMsg:empty{display:none}
 #tapAudio{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+#zoomWrap{position:absolute;inset:0;transform-origin:50% 50%;transition:transform .25s}
+#overlay{position:absolute;inset:0;pointer-events:none}
+#overlay.edit{pointer-events:auto;cursor:crosshair;background:rgba(0,0,0,.25);touch-action:none}
+#roiBox,#roiDraft,#motionBox{position:absolute;display:none;border-radius:6px}
+#roiBox{border:2px dashed rgba(139,124,255,.9)}
+#roiDraft{border:2px solid #fff;background:rgba(139,124,255,.25)}
+#motionBox{border:2px solid var(--warn);box-shadow:0 0 12px rgba(255,176,32,.7);transition:opacity .6s}
+#roiBar{position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:6px;align-items:center;background:rgba(0,0,0,.75);border-radius:12px;padding:8px;font-size:13px;z-index:3}
+.setup{display:flex;gap:10px;align-items:center;background:#2a2244;border-radius:14px;padding:12px;margin-bottom:10px;font-size:14px}
+.setup b{display:block}
+.batlow{color:var(--bad)!important}
 .controls{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
 .controls button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px;font-size:12px;background:var(--card)}
 .controls button .e{font-size:22px}
@@ -141,7 +153,7 @@ code{background:#11132a;padding:2px 6px;border-radius:6px;font-size:13px;word-br
     <button class="role" id="pickParent" style="width:100%"><span class="ic" style="background:#163f3c">📱</span><span><b>Parent</b><small>Watch, listen, talk and get alerts</small></span></button>
   </div>
   <button id="switchRole" class="small hidden" style="align-self:center">Switch role</button>
-  <p class="fine" style="text-align:center">Open this same page on both phones · v4</p>
+  <p class="fine" style="text-align:center">Open this same page on both phones · v6</p>
 </section>
 
 <!-- ================= CAMERA ================= -->
@@ -181,7 +193,8 @@ code{background:#11132a;padding:2px 6px;border-radius:6px;font-size:13px;word-br
   <div id="camMore" class="sheet hidden"><div class="inner">
     <h2>Camera settings</h2>
     <div class="set"><span>Night light (warm glow on this screen)</span><button class="small" id="btnCamLight">Turn on</button></div>
-    <div class="set"><span>Switch to front camera</span><button class="small" id="btnFlip">Switch</button></div>
+    <div class="set"><span>🔴 Soft red light for dark rooms<br><small class="fine">Uses the front camera and turns this screen into a dim red glow. Turn the screen toward the crib.</small></span><button class="small" id="btnCamSoft">Turn on</button></div>
+    <div class="set"><span>Switch camera</span><button class="small" id="btnFlip">Front camera</button></div>
     <div class="set"><span>Auto-reconnect</span><span id="camRelayState" class="fine">—</span></div>
     <h3>Danger zone</h3>
     <p class="fine">Resetting creates new keys. Every paired parent phone is disconnected and must scan again.</p>
@@ -224,8 +237,9 @@ code{background:#11132a;padding:2px 6px;border-radius:6px;font-size:13px;word-br
 
   <div id="pLive" class="hidden">
     <div class="stage">
-      <video id="liveVideo" playsinline autoplay></video>
-      <div class="tl"><span class="live" id="liveBadge">● LIVE</span><span class="tag" id="sessTime"></span><span class="rec hidden" id="recBadge">● REC</span></div>
+      <div id="zoomWrap"><video id="liveVideo" playsinline autoplay></video><div id="overlay"><div id="roiBox"></div><div id="motionBox"></div><div id="roiDraft"></div></div></div>
+      <div class="tl"><span class="live" id="liveBadge">● LIVE</span><span class="tag" id="sessTime"></span><span class="rec hidden" id="recBadge">● REC</span><span class="tag hidden" id="nvBadge">🌙 Night vision</span></div>
+      <div id="roiBar" class="hidden"><span id="roiHint">Drag a box around the crib</span><span class="spacer"></span><button class="small" id="roiAll">Whole picture</button><button class="small" id="roiCancel">Cancel</button><button class="small primary" id="roiSave">Save</button></div>
       <div class="tr"><span class="tag">🔒</span><button class="small tag" id="btnZoom" style="padding:4px 10px">1×</button></div>
       <div id="stageMsg"></div>
       <button id="tapAudio" class="primary hidden">🔊 Tap to hear sound</button>
@@ -239,7 +253,12 @@ code{background:#11132a;padding:2px 6px;border-radius:6px;font-size:13px;word-br
       <button id="btnMute"><span class="e">🔊</span>Sound on</button>
       <button id="btnBoost"><span class="e">🌗</span>Brighten</button>
       <button id="btnDimP"><span class="e">🌙</span>Dim</button>
+      <button id="btnNight"><span class="e">🌃</span>Night: Auto</button>
+      <button id="btnSoft"><span class="e">🔴</span>Red light</button>
+      <button id="btnRoi"><span class="e">🔲</span>Detect area</button>
+      <button id="btnBattery"><span class="e">🔋</span><span id="batTxt">Battery</span></button>
     </div>
+    <div id="setupCards"></div>
     <p id="soundState" class="fine hidden" style="margin:0 0 10px"></p>
     <div class="card">
       <div class="meter"><span>Motion</span><div class="bar"><i id="pMotion"></i><b id="pMotionT"></b></div></div>
@@ -283,9 +302,11 @@ code{background:#11132a;padding:2px 6px;border-radius:6px;font-size:13px;word-br
   <h3>Video</h3>
   <div class="set"><label for="sQuality">Video quality</label>
     <select id="sQuality"><option value="low">Low (saves battery)</option><option value="normal">Normal</option><option value="high">High</option></select></div>
-  <h3>Lock-screen notifications</h3>
+  <h3 id="pushSection">Notifications when this page is closed</h3>
   <div class="set"><label for="sPush">Send alerts to the ntfy app</label><input type="checkbox" id="sPush"></div>
   <div id="pushHelp" class="hint hidden"></div>
+  <h3 id="batteryHelp">Camera battery</h3>
+  <div id="batHelp" class="hint"></div>
   <h3>Paired camera</h3>
   <p id="pairedInfo" class="fine"></p>
   <button id="btnRepairQR" style="width:100%;margin-bottom:8px">Pair again with QR code</button>
@@ -356,8 +377,8 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
   del(k) { try { localStorage.removeItem(k); } catch (e) {} }
 };
-const DEFAULTS = { alertMotion: true, motionSens: 0.5, alertSound: true, soundSens: 0.5, alertLost: true, alarm: true,
-                   cooldown: 60, clips: true, keepDays: 7, quality: 'normal', push: false };
+const DEFAULTS = { alertMotion: true, motionSens: 0.65, alertSound: true, soundSens: 0.5, alertLost: true, alarm: true,
+                   cooldown: 60, clips: true, keepDays: 7, quality: 'normal', push: true };
 const S = Object.assign({}, DEFAULTS, store.get('bm-settings', {}));
 const saveSettings = () => store.set('bm-settings', S);
 const motionThreshold = (s) => 0.20 * Math.pow(0.05, s);
@@ -444,12 +465,17 @@ function beep(times, freq) {
 let wantAwake = false;
 async function keepAwake() { wantAwake = true; try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {} }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wantAwake) keepAwake(); });
-function dim(on, night) {
+function dim(on, kind) {   // kind: false (black), 'warm', 'red'
   const d = $('#dim');
   d.classList.toggle('hidden', !on);
-  d.classList.toggle('night', !!night);
+  d.classList.toggle('night', on && (kind === 'warm' || kind === true));
+  d.classList.toggle('red', on && kind === 'red');
 }
-$('#dim').addEventListener('click', () => { if (MODE === 'camera' && cam.light) { setNightLight(false); } dim(false); });
+$('#dim').addEventListener('click', () => {
+  if (MODE === 'camera' && cam.soft) { setSoftLight(false); return; }
+  if (MODE === 'camera' && cam.light) { setNightLight(false); return; }
+  dim(false);
+});
 
 // ---------------- SDP <-> compact text ----------------
 function b64url(bytes) { let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
@@ -636,12 +662,17 @@ class Peer {
 // =========================================================================
 //  CAMERA PHONE
 // =========================================================================
+// Motion + sound analysis on the camera phone.
+// Motion compares each frame with a slowly-updated background picture (catches slow baby movements),
+// boosts dark frames before comparing, adapts its threshold to camera noise, ignores isolated noisy
+// pixels, and only counts the detection area chosen on the parent phone.
 class Analyzer {
   constructor(video, stream, ac) {
-    this.video = video; this.prev = null; this.motionMax = 0; this.soundMax = -100;
+    this.video = video; this.bg = null; this.prev = null; this.noise = 6; this.gain = 1; this.mean = 128;
+    this.motionMax = 0; this.soundMax = -100; this.box = null; this.roi = [0, 0, 1, 1];
     this.canvas = document.createElement('canvas'); this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
     this.attachAudio(stream, ac);
-    this.timer = setInterval(() => this.tick(), 150);
+    this.timer = setInterval(() => this.tick(), 140);
   }
   attachAudio(stream, ac) {
     this.an = null;
@@ -654,21 +685,47 @@ class Analyzer {
       this.buf = new Float32Array(this.an.fftSize);
     } catch (e) { this.an = null; }
   }
+  setRoi(r) {
+    const ok = Array.isArray(r) && r.length === 4 && r.every((x) => typeof x === 'number' && x >= 0 && x <= 1);
+    this.roi = ok ? r : [0, 0, 1, 1];
+  }
   tick() {
     const v = this.video;
     if (v.readyState >= 2 && v.videoWidth) {
-      const portrait = v.videoHeight > v.videoWidth, W = portrait ? 48 : 64, H = portrait ? 64 : 48;
-      if (this.canvas.width !== W || this.canvas.height !== H) { this.canvas.width = W; this.canvas.height = H; this.prev = null; }
+      const portrait = v.videoHeight > v.videoWidth, W = portrait ? 60 : 80, H = portrait ? 80 : 60, n = W * H;
+      if (this.canvas.width !== W || this.canvas.height !== H) { this.canvas.width = W; this.canvas.height = H; this.bg = null; }
       this.ctx.drawImage(v, 0, 0, W, H);
-      const d = this.ctx.getImageData(0, 0, W, H).data, n = W * H, cur = new Uint8Array(n);
-      let sum = 0;
-      for (let i = 0, j = 0; i < n; i++, j += 4) { const y = (d[j] * 77 + d[j + 1] * 150 + d[j + 2] * 29) >> 8; cur[i] = y; sum += y; }
-      if (this.prev) {
-        let ps = 0; for (let i = 0; i < n; i++) ps += this.prev[i];
-        const shift = (sum - ps) / n; let changed = 0;
-        for (let i = 0; i < n; i++) if (Math.abs(cur[i] - this.prev[i] - shift) > 18) changed++;
-        this.motionMax = Math.max(this.motionMax, changed / n);
+      const d = this.ctx.getImageData(0, 0, W, H).data;
+      let sum = 0; const raw = new Float32Array(n);
+      for (let i = 0, j = 0; i < n; i++, j += 4) { const y = d[j] * 0.299 + d[j + 1] * 0.587 + d[j + 2] * 0.114; raw[i] = y; sum += y; }
+      this.mean = sum / n;
+      const target = Math.min(8, Math.max(1, 100 / Math.max(this.mean, 3)));
+      this.gain += (target - this.gain) * 0.15;                 // smooth boost for dark rooms
+      const g = this.gain, cur = new Float32Array(n); let cm = 0;
+      for (let i = 0; i < n; i++) { cur[i] = raw[i] * g; cm += cur[i]; }
+      cm /= n;
+      if (!this.bg) { this.bg = cur.slice(); this.prev = cur; return; }
+      let bm = 0, nd = 0;
+      for (let i = 0; i < n; i++) { bm += this.bg[i]; nd += Math.abs(cur[i] - this.prev[i]); }
+      bm /= n; nd /= n;
+      this.noise = this.noise * 0.95 + Math.min(nd, 25) * 0.05;   // how "grainy" the picture is
+      const thr = Math.max(9, this.noise * 2.8), shift = cm - bm;  // ignore whole-picture brightness changes
+      const r = this.roi;
+      const x0 = Math.floor(r[0] * W), y0 = Math.floor(r[1] * H);
+      const x1 = Math.min(W, Math.ceil((r[0] + r[2]) * W)), y1 = Math.min(H, Math.ceil((r[1] + r[3]) * H));
+      const mask = new Uint8Array(n);
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = y * W + x; if (Math.abs(cur[i] - this.bg[i] - shift) > thr) mask[i] = 1; }
+      let count = 0, bx0 = W, by0 = H, bx1 = -1, by1 = -1;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const i = y * W + x; if (!mask[i]) continue;
+        // a real movement changes neighbouring spots too; lone specks are camera noise
+        if ((x > 0 && mask[i - 1]) || (x < W - 1 && mask[i + 1]) || (y > 0 && mask[i - W]) || (y < H - 1 && mask[i + W])) {
+          count++; if (x < bx0) bx0 = x; if (y < by0) by0 = y; if (x > bx1) bx1 = x; if (y > by1) by1 = y;
+        }
       }
+      const area = Math.max(1, (x1 - x0) * (y1 - y0)), score = count / area;
+      if (score >= this.motionMax) { this.motionMax = score; this.box = count ? [bx0 / W, by0 / H, (bx1 - bx0 + 1) / W, (by1 - by0 + 1) / H] : null; }
+      for (let i = 0; i < n; i++) this.bg[i] += (cur[i] - this.bg[i]) * 0.07;   // background slowly follows the scene
       this.prev = cur;
     }
     if (this.an) {
@@ -677,7 +734,76 @@ class Analyzer {
       this.soundMax = Math.max(this.soundMax, 20 * Math.log10(Math.max(Math.sqrt(s / this.buf.length), 1e-6)));
     }
   }
-  drain() { const r = { motion: this.motionMax, sound: this.soundMax }; this.motionMax = 0; this.soundMax = -100; return r; }
+  drain() {
+    const r = { motion: this.motionMax, sound: this.soundMax, box: this.box, lum: Math.round(this.mean) };
+    this.motionMax = 0; this.soundMax = -100; this.box = null; return r;
+  }
+}
+
+// Night vision: brightens, de-noises (spatially and over time) and turns very dark scenes
+// black-and-white on the phone's graphics chip, then sends that picture to the parents.
+class NightVision {
+  constructor(video) {
+    this.video = video; this.mode = 'auto'; this.active = false;
+    this.cur = { gain: 1, gamma: 1, mono: 0, blur: 0, alpha: 1 };
+    const c = this.canvas = document.createElement('canvas');
+    c.width = 640; c.height = 480;
+    c.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.01;pointer-events:none';
+    document.body.appendChild(c);
+    const gl = this.gl = c.getContext('webgl', { preserveDrawingBuffer: true, antialias: false, premultipliedAlpha: false });
+    if (!gl || !c.captureStream) throw new Error('night vision unsupported');
+    const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+    const prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, 'attribute vec2 p;varying vec2 uv;void main(){uv=p*0.5+0.5;gl_Position=vec4(p,0.,1.);}'));
+    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, [
+      'precision mediump float;varying vec2 uv;uniform sampler2D t;uniform vec2 px;uniform float gain,gamma,mono,blur;',
+      'void main(){vec3 c=texture2D(t,uv).rgb;',
+      'if(blur>0.5){vec3 s=c*4.;s+=(texture2D(t,uv+vec2(px.x,0.)).rgb+texture2D(t,uv-vec2(px.x,0.)).rgb+texture2D(t,uv+vec2(0.,px.y)).rgb+texture2D(t,uv-vec2(0.,px.y)).rgb)*2.;',
+      's+=texture2D(t,uv+px).rgb+texture2D(t,uv-px).rgb+texture2D(t,uv+vec2(px.x,-px.y)).rgb+texture2D(t,uv+vec2(-px.x,px.y)).rgb;c=s/16.;}',
+      'c=pow(clamp(c*gain,0.,1.),vec3(gamma));float l=dot(c,vec3(.299,.587,.114));c=mix(c,vec3(l),mono);gl_FragColor=vec4(c,1.);}'].join('')));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error('link failed');
+    gl.useProgram(prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+    for (const [k, v] of [[gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE], [gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    this.u = {}; for (const k of ['px', 'gain', 'gamma', 'mono', 'blur']) this.u[k] = gl.getUniformLocation(prog, k);
+    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    this.track = c.captureStream(15).getVideoTracks()[0];
+    if (!this.track) throw new Error('no capture track');
+    const step = (t) => { this.raf = requestAnimationFrame(step); if (t - (this.last || 0) < 62) return; this.last = t; this.draw(); };
+    this.raf = requestAnimationFrame(step);
+  }
+  // how much to boost, from the scene brightness (0-255)
+  update(mean) {
+    let t;
+    if (this.mode === 'off' || (this.mode === 'auto' && mean >= 85)) t = { gain: 1, gamma: 1, mono: 0, blur: 0, alpha: 1 };
+    else if (this.mode === 'on') t = { gain: Math.min(8, Math.max(1.6, 125 / Math.max(mean, 6))), gamma: 0.6, mono: 0.9, blur: 1, alpha: 0.35 };
+    else { const dark = mean < 35; t = { gain: Math.min(6, Math.max(1, 110 / Math.max(mean, 6))), gamma: dark ? 0.65 : 0.8, mono: dark ? 0.85 : 0, blur: mean < 55 ? 1 : 0, alpha: dark ? 0.4 : 0.7 }; }
+    const c = this.cur;
+    c.gain += (t.gain - c.gain) * 0.3; c.gamma += (t.gamma - c.gamma) * 0.3; c.mono += (t.mono - c.mono) * 0.3;
+    c.alpha = t.alpha; c.blur = t.blur;
+    this.active = c.gain > 1.15 || c.mono > 0.1;
+  }
+  draw() {
+    const v = this.video, gl = this.gl;
+    if (v.readyState < 2 || !v.videoWidth) return;
+    let w = v.videoWidth, h = v.videoHeight; const sc = Math.min(1, 960 / Math.max(w, h));
+    w = Math.round(w * sc); h = Math.round(h * sc);
+    if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
+    gl.viewport(0, 0, w, h);
+    try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, v); } catch (e) { return; }
+    const c = this.cur;
+    gl.uniform2f(this.u.px, 1 / w, 1 / h); gl.uniform1f(this.u.gain, c.gain); gl.uniform1f(this.u.gamma, c.gamma);
+    gl.uniform1f(this.u.mono, c.mono); gl.uniform1f(this.u.blur, c.blur);
+    // blend with the previous picture = less grain in the dark
+    if (c.alpha < 0.99) { gl.enable(gl.BLEND); gl.blendColor(0, 0, 0, c.alpha); gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA); }
+    else gl.disable(gl.BLEND);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
 }
 
 // Soothing sounds, generated on the phone (no files, nothing downloaded)
@@ -772,9 +898,15 @@ async function startCamera() {
   catch (e) { text('#camMsg', cameraError(e)); return; }
   const v = $('#camVideo'); v.srcObject = cam.stream; v.play().catch(() => {});
   cam.analyzer = new Analyzer(v, cam.stream, audioCtx);
+  cam.analyzer.setRoi(store.get('bm-cam-roi', [0, 0, 1, 1]));
   cam.scanner = new Scanner(v, onAnswerScanned);
+  // what is sent to parents: night-vision processed picture (falls back to the raw camera)
+  try { cam.nv = new NightVision(v); cam.nv.mode = store.get('bm-cam-night', 'auto'); cam.sendStream = new MediaStream([cam.nv.track, ...cam.stream.getAudioTracks()]); }
+  catch (e) { console.warn('night vision off:', e.message); cam.nv = null; cam.sendStream = cam.stream; }
+  detectTorch();
   cam.soother = new Soother(ensureAudio());
   setInterval(camTick, 500);
+  if (navigator.getBattery) navigator.getBattery().then((b) => { cam.battery = b; }).catch(() => {});
   keepAwake();
   await startCamRelay();
   updateCamPeers();
@@ -795,7 +927,7 @@ async function startCamRelay() {
   });
 }
 function makeCamPeer(initiator) {
-  const peer = new Peer({ initiator, stream: cam.stream, onCtl: onCamCtl, onTrack: onCamTrack, onState: onCamPeerState });
+  const peer = new Peer({ initiator, stream: cam.sendStream || cam.stream, onCtl: onCamCtl, onTrack: onCamTrack, onState: onCamPeerState });
   return peer;
 }
 async function onCamRelay(m) {
@@ -810,6 +942,7 @@ async function onCamRelay(m) {
 function onCamPeerState(peer, st) {
   if (st === 'connected') {
     if (cam.pending === peer) { cam.pending = null; cam.peers.add(peer); closePairing(); beep(2, 1320); store.set('bm-cam-paired-once', true); }
+    cam.last = { motion: 0, sound: 0 };   // a newly connected parent should get the next alert straight away
   } else if (st === 'failed' || st === 'closed') {
     cam.peers.delete(peer); peer.close();
   }
@@ -819,7 +952,7 @@ function onCamCtl(m, peer) {
   switch (m.t) {
     case 'open':
       if (peer.viaQR) peer.send({ t: 'pair', camId: cam.ident.id, secret: cam.ident.secret });
-      peer.send({ t: 'state', light: cam.light, snd: cam.soother && cam.soother.state() });
+      peer.send(camState());
       break;
     case 'hello': peer.parentId = m.id; break;
     case 'settings':
@@ -832,6 +965,10 @@ function onCamCtl(m, peer) {
       broadcastState(); break;
     case 'volume': cam.soother.setVolume(m.vol); broadcastState(); break;
     case 'light': setNightLight(!!m.on); break;
+    case 'soft': setSoftLight(!!m.on); break;
+    case 'night': if (cam.nv) { cam.nv.mode = ['off', 'auto', 'on'].includes(m.mode) ? m.mode : 'auto'; store.set('bm-cam-night', cam.nv.mode); } broadcastState(); break;
+    case 'torch': setTorch(!!m.on); break;
+    case 'roi': cam.analyzer.setRoi(m.r); store.set('bm-cam-roi', cam.analyzer.roi); broadcastState(); break;
   }
 }
 function onCamTrack(e) {
@@ -845,12 +982,44 @@ function setTalking(on) {
   if (on) $('#talkAudio').play().catch(() => {});
 }
 function setNightLight(on) {
+  if (on && cam.soft) { cam.soft = false; }
   cam.light = on;
   text('#btnCamLight', on ? 'Turn off' : 'Turn on');
-  dim(on, on);
+  dim(on, on ? 'warm' : false);
   broadcastState();
 }
-function broadcastState() { const st = { t: 'state', light: cam.light, snd: cam.soother && cam.soother.state() }; for (const p of cam.peers) p.send(st); }
+// Soft red light: the screen faces the crib (front camera) and glows dim red — the colour that
+// disturbs sleep least — so the camera can see without a bright flashlight.
+async function setSoftLight(on) {
+  if (on === cam.soft) return;
+  if (on) {
+    cam.softPrev = cam.facing; cam.light = false;
+    if (cam.facing !== 'user') await setCamFacing('user');
+    cam.soft = true; dim(true, 'red');
+    text('#dimText', 'Red light on · point this screen at the crib · tap to turn off');
+  } else {
+    cam.soft = false; dim(false);
+    if (cam.softPrev && cam.softPrev !== cam.facing) await setCamFacing(cam.softPrev);
+    updateCamPeers();
+  }
+  text('#btnCamSoft', cam.soft ? 'Turn off' : 'Turn on');
+  broadcastState();
+}
+function camState() {
+  return { t: 'state', light: cam.light, soft: !!cam.soft, facing: cam.facing, snd: cam.soother && cam.soother.state(), night: cam.nv ? cam.nv.mode : 'none',
+           torch: cam.torch, torchOK: cam.torchOK, roi: cam.analyzer ? cam.analyzer.roi : [0, 0, 1, 1] };
+}
+function broadcastState() { const st = camState(); for (const p of cam.peers) p.send(st); }
+function detectTorch() {
+  const t = cam.stream && cam.stream.getVideoTracks()[0];
+  try { const caps = t && t.getCapabilities ? t.getCapabilities() : {}; cam.torchOK = !!caps.torch; } catch (e) { cam.torchOK = false; }
+  cam.torch = false;
+}
+async function setTorch(on) {
+  const t = cam.stream.getVideoTracks()[0];
+  try { await t.applyConstraints({ advanced: [{ torch: on }] }); cam.torch = on; } catch (e) { cam.torch = false; }
+  broadcastState();
+}
 function updateCamPeers() {
   const n = [...cam.peers].filter((p) => p.connected).length;
   text('#camPeers', n ? n + ' parent' + (n > 1 ? 's' : '') + ' watching' : 'Waiting for a parent phone…');
@@ -863,11 +1032,15 @@ function camTick() {
   setBar('#camMotion', motionMeter(r.motion)); setBar('#camSound', soundMeter(r.sound));
   const snd = cam.soother && cam.soother.state();
   text('#camInfo', snd ? '🎵 Playing ' + snd.k + (snd.end ? ' · ' + fmtDur(snd.end - Date.now()) + ' left' : '') : '');
-  const msg = { t: 'status', motion: r.motion, sound: r.sound, talking: cam.talking };
+  if (cam.nv) cam.nv.update(r.lum);
+  const msg = { t: 'status', motion: r.motion, sound: r.sound, talking: cam.talking, box: r.box, lum: r.lum, nv: !!(cam.nv && cam.nv.active),
+                battery: cam.battery ? cam.battery.level : undefined, charging: cam.battery ? cam.battery.charging : undefined };
   for (const p of cam.peers) p.send(msg);
   // alerts are decided here, so lock-screen notifications work even when the parent page is closed
   const c = cam.alertCfg || DEFAULTS, now = Date.now();
-  cam.streak.motion = r.motion >= motionThreshold(c.motionSens) ? cam.streak.motion + 1 : 0;
+  const mt = motionThreshold(c.motionSens);
+  cam.hist = (cam.hist || []).concat(r.motion >= mt ? 1 : 0).slice(-3);
+  cam.streak.motion = (cam.hist.reduce((a, b) => a + b, 0) >= 2 || r.motion >= mt * 3) ? 2 : 0;
   const sThr = soundThreshold(c.soundSens) + (snd ? 12 : 0);
   cam.streak.sound = !cam.talking && r.sound >= sThr ? cam.streak.sound + 1 : 0;
   if (c.alertMotion && cam.streak.motion >= 2 && now - cam.last.motion >= c.cooldown * 1000) { cam.last.motion = now; camAlert('motion', 'Movement detected', 'Your baby is moving.'); }
@@ -933,18 +1106,21 @@ $('#btnCamReset').onclick = async () => {
   for (const p of cam.peers) p.close(); cam.peers.clear(); updateCamPeers();
   await startCamRelay(); sheet('camMore', false); openPairing();
 };
-$('#btnFlip').onclick = async () => {
+async function setCamFacing(facing) {
   try {
-    cam.facing = cam.facing === 'environment' ? 'user' : 'environment';
+    cam.facing = facing;
     const s = await getCamStream(cam.facing), nv = s.getVideoTracks()[0];
-    for (const p of cam.peers) for (const snd of p.pc.getSenders()) if (snd.track && snd.track.kind === 'video') await snd.replaceTrack(nv);
+    if (!cam.nv) for (const p of cam.peers) for (const snd of p.pc.getSenders()) if (snd.track && snd.track.kind === 'video') await snd.replaceTrack(nv);
     for (const t of cam.stream.getVideoTracks()) { cam.stream.removeTrack(t); t.stop(); }
     cam.stream.addTrack(nv);
     for (const t of s.getAudioTracks()) t.stop();
     $('#camVideo').srcObject = cam.stream;
     text('#btnFlip', cam.facing === 'user' ? 'Back camera' : 'Front camera');
-  } catch (e) { alert(cameraError(e)); }
-};
+    detectTorch(); broadcastState();
+  } catch (e) { text('#camMsg', cameraError(e)); }
+}
+$('#btnFlip').onclick = () => setCamFacing(cam.facing === 'environment' ? 'user' : 'environment');
+$('#btnCamSoft').onclick = () => { sheet('camMore', false); setSoftLight(!cam.soft); };
 $('#copyOffer').onclick = (e) => { if (cam.pending && cam.pending.offerText) copyText(cam.pending.offerText, e.target); };
 $('#useAnswer').onclick = async () => {
   const raw = $('#answerPaste').value, code = extractCode(ANSWER, raw);
@@ -975,6 +1151,8 @@ async function startParent() {
   par.id = parentIdentity().id;
   par.paired = store.get('bm-paired', null);
   await pruneOld(); renderEvents(); refreshMarks();
+  const lastBat = store.get('bm-battery', null); if (lastBat) setBattery(lastBat);
+  renderSetupCards();
   setInterval(tickParent, 1000);
   if (par.paired) { parentStep(3); setStage('Connecting to your camera…'); await startParentRelay(); tryRelayConnect(); }
   else beginQR();
@@ -988,7 +1166,9 @@ async function startParentRelay() {
   if (par.relay) par.relay.close();
   par.link = await deriveLink(par.paired.secret);
   par.relay = new Relay(par.link, onParentRelay, () => {});
-  updatePushHelp();
+  if (par.pushWatch) par.pushWatch.close();
+  par.pushWatch = new PushWatch(par.link.pushTopic, onPushMessage);
+  updatePushHelp(); renderSetupCards();
 }
 async function tryRelayConnect() {
   clearTimeout(par.retryTimer);
@@ -1106,6 +1286,8 @@ function onParentCtl(m, peer) {
     case 'state':
       par.light = !!m.light; $('#btnLight').classList.toggle('on', par.light);
       par.snd = m.snd || null; updateSoundUI();
+      par.night = m.night; par.soft = !!m.soft; par.torch = !!m.torch; par.torchOK = !!m.torchOK; par.roi = m.roi || [0, 0, 1, 1];
+      updateCamControls(); drawRoi();
       break;
   }
 }
@@ -1130,6 +1312,9 @@ async function onStatus(m) {
   if (par.lost && par.peer && par.peer.connected) { par.lost = false; setStage(''); addEvent({ kind: 'connection', title: 'Signal restored' }); }
   const motion = Number(m.motion) || 0, sound = Number.isFinite(m.sound) ? m.sound : -100;
   setBar('#pMotion', motionMeter(motion)); setBar('#pSound', soundMeter(sound));
+  $('#nvBadge').classList.toggle('hidden', !m.nv);
+  if (m.box && motion >= motionThreshold(S.motionSens) * 0.6) showMotionBox(m.box);
+  if (typeof m.battery === 'number') setBattery({ level: Math.round(m.battery * 100), charging: !!m.charging, ts: Date.now(), live: true });
   // per-minute history for the sleep chart
   const minute = Math.floor(Date.now() / 60000);
   if (!par.minute || par.minute.m !== minute) { if (par.minute) DB.put('levels', par.minute).catch(() => {}); par.minute = { m: minute, mo: 0, so: -100 }; }
@@ -1138,8 +1323,10 @@ async function onStatus(m) {
 
 // ---- parent: alerts, photos, clips ----
 const ICONS = { motion: '🧸', sound: '🔊', connection: '📶', photo: '📸', clip: '🎬' };
-function snapBlob(maxW) {
-  const v = $('#liveVideo'); if (!v.videoWidth) return Promise.resolve(null);
+async function snapBlob(maxW) {
+  const v = $('#liveVideo');
+  for (let i = 0; i < 30 && !v.videoWidth; i++) await new Promise((r) => setTimeout(r, 100));   // video may still be starting
+  if (!v.videoWidth) return null;
   const w = Math.min(maxW || 1280, v.videoWidth), h = Math.round(w * v.videoHeight / v.videoWidth);
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   c.getContext('2d').drawImage(v, 0, 0, w, h);
@@ -1341,7 +1528,8 @@ $('#tapAudio').onclick = () => { const v = $('#liveVideo'); v.muted = false; v.p
 $('#btnBoost').onclick = () => { $('#liveVideo').classList.toggle('boost'); $('#btnBoost').classList.toggle('on'); };
 $('#btnDimP').onclick = () => dim(true, false);
 $('#btnLight').onclick = () => { if (par.peer) par.peer.send({ t: 'light', on: !par.light }); };
-$('#btnZoom').onclick = () => { par.zoom = par.zoom >= 3 ? 1 : par.zoom + 1; $('#liveVideo').style.transform = 'scale(' + par.zoom + ')'; text('#btnZoom', par.zoom + '×'); };
+function setZoom(z) { par.zoom = z; $('#zoomWrap').style.transform = 'scale(' + z + ')'; text('#btnZoom', z + '×'); }
+$('#btnZoom').onclick = () => setZoom(par.zoom >= 3 ? 1 : par.zoom + 1);
 $('#btnSounds').onclick = () => openSounds();
 $('#tabAct').onclick = () => { $('#tabAct').classList.add('sel'); $('#tabSleep').classList.remove('sel'); $('#actPanel').classList.remove('hidden'); $('#sleepPanel').classList.add('hidden'); };
 $('#tabSleep').onclick = () => { $('#tabSleep').classList.add('sel'); $('#tabAct').classList.remove('sel'); $('#sleepPanel').classList.remove('hidden'); $('#actPanel').classList.add('hidden'); renderSleep(); };
@@ -1355,6 +1543,126 @@ $('#useOffer').onclick = () => {
   text('#p1msg', 'Checking code…'); useOffer(code);
 };
 $('#copyAnswer').onclick = (e) => { if (par.answerText) copyText(par.answerText, e.target); };
+
+// ---- detection area, motion box, night vision, flashlight ----
+function contentBox() {
+  const v = $('#liveVideo'), W = v.clientWidth, H = v.clientHeight, vw = v.videoWidth || 3, vh = v.videoHeight || 4;
+  const sc = Math.min(W / vw, H / vh), w = vw * sc, h = vh * sc;
+  return { x: (W - w) / 2, y: (H - h) / 2, w, h };
+}
+function place(el, r) {
+  if (!$('#liveVideo').videoWidth) { el.style.display = 'none'; return; }   // size not known yet
+  const b = contentBox();
+  Object.assign(el.style, { display: 'block', left: (b.x + r[0] * b.w) + 'px', top: (b.y + r[1] * b.h) + 'px', width: (r[2] * b.w) + 'px', height: (r[3] * b.h) + 'px' });
+}
+function drawRoi() {
+  const r = par.roi || [0, 0, 1, 1], full = r[0] <= 0.001 && r[1] <= 0.001 && r[2] >= 0.999 && r[3] >= 0.999;
+  if (full) $('#roiBox').style.display = 'none'; else place($('#roiBox'), r);
+}
+let motionBoxTimer = null;
+function showMotionBox(b) {
+  const el = $('#motionBox'); place(el, b); el.style.opacity = '1';
+  clearTimeout(motionBoxTimer); motionBoxTimer = setTimeout(() => { el.style.opacity = '0'; }, 1200);
+}
+window.addEventListener('resize', () => drawRoi());
+$('#liveVideo').addEventListener('resize', () => drawRoi());
+$('#liveVideo').addEventListener('loadedmetadata', () => drawRoi());
+const roiEd = { on: false, start: null, rect: null };
+function roiPoint(e) {
+  const ov = $('#overlay').getBoundingClientRect(), b = contentBox();
+  return [Math.min(1, Math.max(0, (e.clientX - ov.left - b.x) / b.w)), Math.min(1, Math.max(0, (e.clientY - ov.top - b.y) / b.h))];
+}
+function roiMode(on) {
+  roiEd.on = on; roiEd.rect = null; $('#roiDraft').style.display = 'none';
+  text('#roiHint', 'Drag a box around the crib');
+  $('#overlay').classList.toggle('edit', on); $('#roiBar').classList.toggle('hidden', !on);
+  if (on) setZoom(1);
+}
+$('#overlay').addEventListener('pointerdown', (e) => { if (!roiEd.on) return; e.preventDefault(); roiEd.start = roiPoint(e); try { $('#overlay').setPointerCapture(e.pointerId); } catch (x) {} });
+$('#overlay').addEventListener('pointermove', (e) => {
+  if (!roiEd.on || !roiEd.start) return;
+  const p = roiPoint(e), s0 = roiEd.start;
+  roiEd.rect = [Math.min(s0[0], p[0]), Math.min(s0[1], p[1]), Math.abs(p[0] - s0[0]), Math.abs(p[1] - s0[1])];
+  place($('#roiDraft'), roiEd.rect);
+});
+$('#overlay').addEventListener('pointerup', () => { roiEd.start = null; });
+$('#btnRoi').onclick = () => { if (par.peer && par.peer.connected) roiMode(true); };
+$('#roiCancel').onclick = () => roiMode(false);
+$('#roiAll').onclick = () => { if (par.peer) par.peer.send({ t: 'roi', r: [0, 0, 1, 1] }); roiMode(false); };
+$('#roiSave').onclick = () => {
+  const r = roiEd.rect;
+  if (!r || r[2] < 0.05 || r[3] < 0.05) { text('#roiHint', 'Drag a bigger box first'); return; }
+  if (par.peer) par.peer.send({ t: 'roi', r }); roiMode(false);
+};
+const NIGHT_NEXT = { auto: 'on', on: 'off', off: 'auto' }, NIGHT_LABEL = { auto: 'Night: Auto', on: 'Night: Max', off: 'Night: Off' };
+$('#btnNight').onclick = () => { if (par.peer && par.night && par.night !== 'none') par.peer.send({ t: 'night', mode: NIGHT_NEXT[par.night] || 'auto' }); };
+$('#btnSoft').onclick = () => {
+  if (!par.peer || !par.peer.connected) return;
+  if (!par.soft && !store.get('bm-soft-tip', false)) {
+    store.set('bm-soft-tip', true);
+    alert('Soft red light: the camera phone switches to its FRONT camera and its screen glows dim red.\n\nPlace the camera phone with its SCREEN facing the crib (about 1 m away). Set its brightness to about 40% and turn off Auto-Brightness so the glow stays on.');
+  }
+  par.peer.send({ t: 'soft', on: !par.soft });
+};
+function updateCamControls() {
+  const n = par.night && par.night !== 'none' ? par.night : null;
+  $('#btnNight').lastChild.textContent = n ? NIGHT_LABEL[n] : 'Night: n/a';
+  $('#btnNight').classList.toggle('on', n === 'on');
+  $('#btnSoft').classList.toggle('on', !!par.soft);
+  $('#btnSoft').lastChild.textContent = par.soft ? 'Red light on' : 'Red light';
+  $('#btnRoi').classList.toggle('on', !!par.roi && !(par.roi[2] >= 0.999 && par.roi[3] >= 0.999));
+}
+
+// ---- camera battery (iPhone browsers can't read the battery; an iOS Shortcut reports it) ----
+function setBattery(b) {
+  par.battery = b; if (!b.live) store.set('bm-battery', b);
+  const age = Date.now() - b.ts;
+  let t = b.level != null ? b.level + '%' : (b.charging === false ? 'Unplugged' : 'Charging');
+  if (b.charging && b.level != null) t += ' ⚡';
+  text('#batTxt', t + (b.live || age < 120000 ? '' : ' · ' + fmtDur(age) + ' ago'));
+  const btn = $('#btnBattery');
+  btn.classList.toggle('batlow', (b.level != null && b.level <= 20 && !b.charging) || b.charging === false);
+  btn.style.opacity = age > 6 * 3600000 ? '0.6' : '1';
+}
+class PushWatch {   // listens to the alert topic, so Shortcut battery reports show up here
+  constructor(topic, onMsg) { this.topic = topic; this.onMsg = onMsg; this.backoff = 2000; this.closed = false; this.connect(); }
+  connect() {
+    if (this.closed) return;
+    let ws; try { ws = new WebSocket(RELAY.replace(/^http/, 'ws') + '/' + this.topic + '/ws'); } catch (e) { return; }
+    this.ws = ws;
+    ws.onmessage = (e) => { try { const m = JSON.parse(e.data); if (m.event === 'message') this.onMsg(m); } catch (x) {} };
+    ws.onopen = () => { this.backoff = 2000; };
+    ws.onclose = () => { if (!this.closed) { setTimeout(() => this.connect(), this.backoff); this.backoff = Math.min(this.backoff * 2, 60000); } };
+  }
+  close() { this.closed = true; try { this.ws.close(); } catch (e) {} }
+}
+function onPushMessage(m) {
+  const txt = ((m.title || '') + ' ' + (m.message || '')).toLowerCase();
+  if (!txt.includes('charger') && !txt.includes('battery')) return;
+  const pct = txt.match(/(\d{1,3})\s*%/), prev = par.battery || {};
+  let charging = prev.charging;
+  if (txt.includes('disconnect') || txt.includes('unplug')) charging = false;
+  else if (txt.includes('connected') || txt.includes('charging')) charging = true;
+  const b = { level: pct ? Math.min(100, +pct[1]) : (prev.level != null ? prev.level : null), ts: Date.now(), charging };
+  setBattery(b);
+  if (charging === false && txt.includes('disconnect')) raise('connection', 'Camera charger unplugged', 'The camera phone is running on battery.', true);
+  else if (b.level != null && b.level <= 20 && !charging) raise('connection', 'Camera battery low (' + b.level + '%)', 'Plug in the camera phone.', true);
+}
+function openSettingsAt(id) { bindSettings(); sheet('settings', true); setTimeout(() => { const el = $(id); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 60); }
+$('#btnBattery').onclick = () => openSettingsAt('#batteryHelp');
+function renderSetupCards() {
+  const box = $('#setupCards'); if (!box) return; box.innerHTML = '';
+  const add = (icon, title, sub, fn, key) => {
+    if (store.get('bm-hide-' + key, false)) return;
+    const d = document.createElement('div'); d.className = 'setup';
+    d.innerHTML = '<span style="font-size:24px">' + icon + '</span><span style="flex:1"><b></b><span class="fine"></span></span><button class="small primary">Set up</button><button class="small">✕</button>';
+    d.querySelector('b').textContent = title; d.querySelector('.fine').textContent = sub;
+    const btns = d.querySelectorAll('button'); btns[0].onclick = fn; btns[1].onclick = () => { store.set('bm-hide-' + key, true); d.remove(); };
+    box.appendChild(d);
+  };
+  if (!store.get('bm-push-done', false)) add('🔔', 'Alerts when this page is closed', 'Movement & crying notifications on your lock screen (2 min setup).', () => openSettingsAt('#pushSection'), 'push');
+  if (!par.battery) add('🔋', 'Show camera battery', 'iPhone hides the battery from web pages — a free Shortcut reports it.', () => openSettingsAt('#batteryHelp'), 'battery');
+}
 
 // ---- sounds sheet (shared by camera & parent) ----
 function soundCommand(cmd) {
@@ -1379,21 +1687,52 @@ $('#closeSounds').onclick = () => sheet('sounds', false);
 
 // ---- settings sheet ----
 function refreshMarks() { setMark('#pMotionT', motionMeter(motionThreshold(S.motionSens))); setMark('#pSoundT', soundMeter(soundThreshold(S.soundSens))); }
+function batteryHelp() {
+  const box = $('#batHelp');
+  if (!par.link) { box.textContent = 'Pair with the camera first.'; return; }
+  box.innerHTML = '<p style="margin:0 0 6px">iPhone doesn’t let web pages read the battery, so a free <b>Shortcuts</b> automation on the <b>camera phone</b> reports it. Do this once on the camera phone:</p>' +
+    '<ol style="margin:0;padding-left:18px">' +
+    '<li>Open <b>Shortcuts</b> › <b>Automation</b> › <b>+</b> › <b>Battery Level</b> › <b>Falls Below 50%</b> › <b>Run Immediately</b> › Next › <b>New Blank Automation</b>.</li>' +
+    '<li>Add the action <b>Get Battery Level</b>.</li>' +
+    '<li>Add the action <b>Get Contents of URL</b>. URL: <code>https://ntfy.sh</code>. Tap ▸ to expand: Method <b>POST</b>, Request Body <b>JSON</b>, then add 3 Text fields:<br>' +
+    '<code>topic</code> = <code class="pt"></code> <button class="small cpt">Copy</button><br>' +
+    '<code>title</code> = <code>Camera battery</code><br>' +
+    '<code>message</code> = <code>Battery </code> + the <b>Battery Level</b> variable + <code>%</code></li>' +
+    '<li>Duplicate it (long-press › Duplicate) for <b>Falls Below 20%</b> and <b>10%</b>.</li>' +
+    '<li>Recommended: an automation for <b>Charger › Is Disconnected</b> with message <code>Charger disconnected</code> (and <b>Is Connected</b> with <code>Charger connected</code>).</li></ol>' +
+    '<p class="fine">Reports show on the 🔋 button and arrive as lock-screen notifications in the ntfy app. Only the battery text is sent.</p>' +
+    '<button class="small" id="testBattery">Show an example report</button>';
+  for (const el of box.querySelectorAll('.pt')) el.textContent = par.link.pushTopic;
+  for (const b of box.querySelectorAll('.cpt')) b.onclick = (e) => copyText(par.link.pushTopic, e.target);
+  $('#testBattery').onclick = () => onPushMessage({ title: 'Camera battery', message: 'Battery 64%' });
+}
 function updatePushHelp() {
   const box = $('#pushHelp');
   if (!S.push) { box.classList.add('hidden'); return; }
   box.classList.remove('hidden');
   if (!par.link) { box.textContent = 'Pair with the camera first.'; return; }
-  box.innerHTML = '<b>Set up once:</b><ol style="margin:6px 0;padding-left:18px"><li>Install the free <b>ntfy</b> app from the App Store and allow notifications.</li><li>Tap <b>+</b>, enter this topic, keep server <b>ntfy.sh</b>, tap Subscribe:</li></ol><code id="pushTopic"></code> <button class="small" id="copyTopic">Copy</button><p class="fine">You’ll get “Movement detected / Sound detected” on the lock screen even when this page is closed. Only the alert text passes through ntfy.sh — never video, sound or photos. Keep the topic private.</p>';
+  box.innerHTML = '<b>Set up once on THIS phone:</b><ol style="margin:6px 0;padding-left:18px"><li>Install the free <b>ntfy</b> app from the App Store, open it and <b>allow notifications</b>.</li><li>Tap <b>+</b>, paste this topic, keep server <b>ntfy.sh</b>, tap <b>Subscribe</b>:</li></ol>' +
+    '<code id="pushTopic"></code> <button class="small" id="copyTopic">Copy</button>' +
+    '<p><button class="small primary" id="testPush">Send test notification</button> <span id="testPushMsg" class="fine"></span></p>' +
+    '<p class="fine">Alerts are sent by the <b>camera phone</b>, so they arrive even when this page or Safari is closed — as long as Baby Monitor stays open on the camera phone. You also get one if the camera page gets closed. Only the alert text passes through ntfy.sh — never video, sound or photos.</p>';
   text('#pushTopic', par.link.pushTopic);
   $('#copyTopic').onclick = (e) => copyText(par.link.pushTopic, e.target);
+  $('#testPush').onclick = async () => {
+    try {
+      const r = await fetch(RELAY + '/' + par.link.pushTopic + '?title=' + encodeURIComponent('👶 Test from Baby Monitor') + '&priority=high&tags=baby',
+                            { method: 'POST', body: 'If you see this on your lock screen, alerts are set up.' });
+      text('#testPushMsg', r.ok ? 'Sent ✓ — check your notifications' : 'Failed');
+      if (r.ok) { store.set('bm-push-done', true); renderSetupCards(); }
+    } catch (e) { text('#testPushMsg', 'No internet'); }
+  };
 }
+
 function bindSettings() {
   $('#sMotion').checked = S.alertMotion; $('#sSound').checked = S.alertSound; $('#sLost').checked = S.alertLost; $('#sAlarm').checked = S.alarm;
   $('#sMotionSens').value = S.motionSens; $('#sSoundSens').value = S.soundSens; $('#sCooldown').value = String(S.cooldown);
   $('#sClips').checked = S.clips; $('#sKeep').value = String(S.keepDays); $('#sQuality').value = S.quality; $('#sPush').checked = S.push;
   text('#pairedInfo', par.paired ? 'Paired on ' + new Date(par.paired.at).toLocaleDateString() + '. It reconnects automatically whenever both pages are open.' : 'No camera paired yet.');
-  updatePushHelp();
+  updatePushHelp(); batteryHelp();
 }
 $('#settings').addEventListener('change', () => {
   S.alertMotion = $('#sMotion').checked; S.alertSound = $('#sSound').checked; S.alertLost = $('#sLost').checked; S.alarm = $('#sAlarm').checked;
